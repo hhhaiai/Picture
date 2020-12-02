@@ -1,2 +1,3 @@
 # Picture
-github搭建的图床
+Typora使用的图床
+
