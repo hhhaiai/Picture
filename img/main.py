@@ -19,6 +19,9 @@ import json
 from urllib.parse import unquote
 
 
+
+
+
 url = 'https://api.github.com/repos/xxx_username_xxx/xxx_仓库名——xxx/contents/img/blog/'
 headers = {'content-type': 'application/json', 'Authorization': 'Bearer xxx_your_token_xxx'}
 data = {
