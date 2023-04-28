@@ -1,0 +1,684 @@
+>>>>>>> $(build)功能分析 <<<<<<<
+
+内核顶层Makefile
+ |- include scripts/Kbuild.include
+ |           |- build := -f $(srctree)/scripts/Makefile.build obj
+ |
+ |  # 场景1：展开后的make命令行，没有指定编译目标
+ |- scripts_basic:
+ |      $(Q)$(MAKE) $(build)=scripts/basic
+ |          |- make -f $(srctree)/scripts/Makefile.build obj=scripts/basic
+ |                                 |
+ |                                 |- src := $(obj)
+ |                                 |
+ |                                 |  # 将$(src)转换为绝对路径，赋值给kbuild-dir
+ |                                 |  # 具体做法：如果$(filter /%,$(src))不为空，直接返回$(src)，否则返回$(srctree)/$(src)
+ |                                 |- kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
+ |                                 |                       |                          |- 前面加$(srctree)/，即内核源码所在目录
+ |                                 |                       |- 返回$(src)中，以’/’开头的内容 ($(src)为绝对路径，返回$(src)，否则返回空)
+ |                                 |
+ |                                 |  # 如果$(kbuild-dir)目录中如果既有Kbuild，又有Makefile，优先使用Kbuild
+ |                                 |  # 具体做法：如果$(wildcard $(kbuild-dir)/Kbuild)不为空，返回$(kbuild-dir)/Kbuild，否则返回$(kbuild-dir)/Makefile
+ |                                 |- kbuild-file := $(if $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Kbuild,$(kbuild-dir)/Makefile)
+ |                                 |                        |                                 |- 优先使用Kbuild    |
+ |                                 |                        |                                                      |- 其次使用Makefile
+ |                                 |                        |
+ |                                 |                        |  # 使用wildcard，是为了文件不存在时，返回空，而不是返回”No such file or directory”这样的错误信息
+ |                                 |                        |- 判断$(kbuild-dir)/Kbuild文件是否存在
+ |                                 |
+ |                                 |- include $(kbuild-file)  # 如果$(kbuild-file)包含编译目标，展开后会位于__build目标之前，成为第一目标
+ |                                 |- 第一编译目标: __build   # 如果$(kbuild-file)不包含编译目标，__build为第一目标
+ |
+ |  # 场景2：展开后的make命令行，指定了编译目标
+ |- %config: scripts_basic outputmakefile FORCE
+        $(Q)$(MAKE) $(build)=scripts/kconfig $@             # 命令行指定编译目标 (优先级最高)
+        |                                    |- menuconfig  # 执行"make menuconfig"时，menuconfig根据模式匹配，命中%config目标
+        |                                                   # 并且使得：%=menu，$@=menuconfig ($@为Makefile自动推导变量，代表当前编译目标)
+        |
+        |  # 嵌套执行scripts/Makefile.build (暂不关心Q、Make，直接认为Q=""，MAKE=make)
+        |- make -f $(srctree)/scripts/Makefile.build obj=scripts/kconfig menuconfig
+                                            |
+                                            |- include scripts/kconfig/Makefile  # 参考"场景1"
+                                                        |- menuconfig: $(obj)/mconf  # 包含menuconfig目标
+                                                           	$< $(silent) $(Kconfig)
+
+
+>>>>>>> $(build)功能总结 <<<<<<<
+
+$(Q)$(MAKE) $(build)=DIR [TARGET]
+              |       |   |
+              |       |   |  # 优先级：指定目标 > DIR/Makefile第一目标 > scripts/Makefile.build第一目标
+              |       |   |- 编译目标 (可以不指定)
+              |       |
+              |       |  # 优先级：Kbuild > Makefile (即DIR/目录既有Kbuild，又有Makefile，则include DIR/Kbuild)
+              |       |- 使scripts/Makefile.build内部，include DIR/Makefile
+              |
+              |- 嵌套执行scripts/Makefile.build
+
+
+>>>>>>> $(if_changed)功能分析 <<<<<<<
+
+if_changed
+ |
+ |  # $(any-prereq)：判断依赖列表中的文件和依赖列表本身是否有更新
+ |  # $(arg-check)：判断传给if_changed的参数内容 (即if_changed内部判断条件成立时，要执行的$(cmd))，跟上次编译相比，是否有变化
+ |- if $(strip $(any-prereq) $(arg-check))
+ |   |           |             |
+ |   |           |             |  # 对比$(cmd_$@)，即上次编译执行的命令 (记录在.cmd文件中)，与$(cmd_$1)，即本次要执行的命令，是否相等
+ |   |           |             |  # 具体做法：从$(cmd_$1)中，去除$(cmd_$@)，如果无剩余部分，说明两者相同，否则不相同
+ |   |           |             |- arg-check = $(filter-out $(subst $(space),$(space_escape),$(strip $(cmd_$@))), \
+ |   |           |                              |          $(subst $(space),$(space_escape),$(strip $(cmd_$1))))
+ |   |           |                              |                                                     |
+ |   |           |                              |                                                     |  # Q：cmd_$@的值来自哪里？
+ |   |           |                              |                                                     |  # A：来自上次编译时，产生/更新的.cmd文件 (见if_changed函数if分支中执行的printf语句)
+ |   |           |                              |                                                     |  # Q：scripts/Makefile.modpost展开后，cmd_$@变量，定义在arg-check之后，所以此处是否还是空的？
+ |   |           |                              |                                                     |  # A：=表示延迟赋值，=:表示立即赋值
+ |   |           |                              |                                                     |- include scripts/Kbuild.include          # scripts/Makefile.modpost，44行
+ |   |           |                              |                                                     |   |- arg-check = ... $(cmd_$@) ...       # "arg-check="语句在前
+ |   |           |                              |                                                     |- include $(dir $(f)).$(notdir $(f)).cmd  # scripts/Makefile.modpost，145~148行
+ |   |           |                              |                                                         |- cmd_$@ := ...                       # "cmd_$@:="语句在后
+ |   |           |                              |
+ |   |           |                              |- $(subst $(space),$(space_escape),$(strip $(cmd_$@)))
+ |   |           |                              |    |- 将$(cmd_$@)中的$(space)替换为$(space_escape)，防止filter-out认为参数传的是列表
+ |   |           |                              |- $(subst $(space),$(space_escape),$(strip $(cmd_$1)))
+ |   |           |                                   |- 将$(cmd_$1)中的$(space)替换为$(space_escape)
+ |   |           |
+ |   |           |  # 判断依赖是否有更新
+ |   |           |- any-prereq = $(filter-out $(PHONY),$?) $(filter-out $(PHONY) $(wildcard $^),$^)
+ |   |                             |                         |                     |
+ |   |                             |                         |                     |  # 使用wildcard，是为了文件不存在时，返回空，而不是返回”No such file or directory”这样的错误信息
+ |   |                             |                         |                     |- 返回$^中已经存在的文件
+ |   |                             |                         |
+ |   |                             |                         |  # 返回依赖列表中不存在/被删除的文件
+ |   |                             |                         |- 从$^去除伪目标和已经存在的文件  # $^为Makefile自动推导变量，表示前编译规则的完整依赖列表
+ |   |                             |
+ |   |                             |  # 存在，但已更新的依赖文件 (根据与目标文件对比时间戳判断)
+ |   |                             |- 从$?去除伪目标  # $?为Makefile自动推导变量，表示依赖列表中存在但已更新的文件
+ |   |
+ |   |  # 执行cmd_$(1) (注意：当前语句以;结束，所以后面的printf语句也会在if分支中执行)
+ |   |- $(cmd);
+ |   |    |- cmd = @set -e; $(echo-cmd) $(cmd_$(1))
+ |   |                        |           |  # $(1)为if_changed的第1个参数，比如$(call if_changed,ld_ko_o)，则$(1)等于ld_ko_o
+ |   |                        |           |- cmd_ld_ko_o
+ |   |                        |- 打印信息
+ |   |
+ |   |- printf '%s\n' 'cmd_$@ := $(make-cmd)' > $(dot-target).cmd
+ |                                 |              |
+ |                                 |              |- 将本次执行的命令内容，记录到.cmd文件 (即$(arg-check)中用到的cmd_$@)
+ |                                 |
+ |                                 |  # 可以简单认为就是$(cmd_$(1))的内容 (对',#,$字符做了替换)
+ |                                 |- make-cmd = $(call escsq,$(subst $(pound),$$(pound),$(subst $$,$$$$,$(cmd_$(1)))))
+ |- else
+     |  # :为shell空语句
+     |  # @表示要求make不要回显执行命令
+     |- @:
+
+
+>>>>>>> $(if_changed)功能总结 <<<<<<<
+
+$(call if_changed,XX)
+ |
+ |- 如果编译目标的依赖文件不存在或已更新，执行cmd_XX
+
+
+>>>>>>> 外部模块Makefile执行过程 <<<<<<<
+
+外部模块Makefile
+ |
+ |  # 可以看出，ifeq、ifneq、ifdef、ifndef判断语句，会被直接执行，这跟赋值语句不同 (只有变量被使用时才被执行)
+ |- ifneq ($(KERNELRELEASE),)  # 再次进入，KERNELRELEASE不为空，执行if分支
+ |   |- obj-m := hello.o
+ |   |- obj-m += sub1/ sub2/   # 目标为目录，会递归执行子目录中的Makefile (参考：后续对$(subdir-ym)目标的分析)
+ |- else                       # 首次进入，KERNELRELEASE为空，执行else分支
+     |- KDIR ?= /lib/modules/`uname -r`/build
+     |- all:
+        $(MAKE) -C $(KDIR) M=$(PWD) modules
+                 |
+                 |- 嵌套执行内核顶层Makefile  # 传入参数"M=$(PWD)"，并且指定编译目标"modules"
+                     |
+                     |- ifeq ("$(origin M)", "command line")
+                     |   |- KBUILD_EXTMOD := $(M)
+                     |
+                     |- KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
+                     |- export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION  # 再次进入外部模块Makefile，KERNELRELEASE不为空
+                     |
+                     |- ifeq ($(KBUILD_EXTMOD),)
+                     |   |- ...
+                     |- else
+                         |  # 编译外部模块
+                         |- KBUILD_MODULES := 1
+                         |- module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
+                         |
+                         |  # 链接.o，生成.ko (.o文件通过$(module-dirs)依赖目标产生)
+                         |- modules: $(module-dirs)
+                             |  @$(kecho) '  Building modules, stage 2.';
+                             |  $(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost  # 展开：make -f $(srctree)/scripts/Makefile.build obj=$(srctree)/scripts/Makefile.modpost
+                             |      |
+                             |      |  # 执行链接命令
+                             |      |- $(modules): %.ko :%.o %.mod.o FORCE
+                             |           | +$(call if_changed,ld_ko_o)
+                             |           |                     |
+                             |           |                     |- quiet_cmd_ld_ko_o = LD [M]  $@
+                             |           |                              cmd_ld_ko_o =                                                     \
+                             |           |                            $(LD) -r $(KBUILD_LDFLAGS)                                      \
+                             |           |                                         $(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE)             \
+                             |           |                                         -o $@ $(real-prereqs) ;                                \
+                             |           |                            $(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) $@, true)
+                             |           |
+                             |           |  # 获取.ko文件依赖的.o文件列表
+                             |           |- modules := $(patsubst %.o,%.ko, $(wildcard $(__modules:.ko=.o)))
+                             |                                                             |- __modules := $(shell $(MODLISTCMD))  # $(MODLISTCMD)为shell命令
+                             |                                                                                       |  # 生成$(module-dirs)目标的过程中，向$(MODVERDIR)目录记录了.mod文件
+                             |                                                                                       |- MODLISTCMD := find $(MODVERDIR) -name '*.mod' | xargs -r grep -h '\.ko$$' | sort -u
+                             |
+                             |  # 编译.c，生成.o
+                             |  # 依赖目标：
+                             |  #  prepare：创建或清空$(MODVERDIR)目录
+                             |  #  $(objtree)/Module.symvers：检查Module.symvers文件是否存在
+                             |  # Makefile支持多目标共用一份依赖和命令：
+                             |  #  sub1 sub2 : prerequisites
+                             |  #      command
+                             |  # 等效于：
+                             |  #  sub1 : prerequisites
+                             |  #      command
+                             |  #  sub2 : prerequisites
+                             |  #      command
+                             |- $(module-dirs): prepare $(objtree)/Module.symvers
+                                    $(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
+                                        |
+                                        |- make -f $(srctree)/scripts/Makefile.build obj=外部模块源码目录
+                                                     |
+                                                     |- include 外部模块源码目录/Makefile  # 此时KERNELRELEASE不再为空
+                                                     |- ifdef CONFIG_MODULES
+                                                     |   |- modorder-target := $(obj)/modules.order  # __build目标的依赖目标 (外部模块的编译过程，需要产生modules.order文件)
+                                                     |
+                                                     |  # 执行第一目标 (make命令行("$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)")，没有指定目标，并且外部模块Makefile的ifneq分支，不包含编译目标)
+                                                     |- __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
+                                                            $(if $(KBUILD_MODULES),$(obj-m) $(modorder-target)) \  # 前面已经将KBUILD_MODULES设置为1了
+                                                            $(subdir-ym) $(always)   |        |
+                                                           @: |                      |        |  # 生成modules.order文件
+                                                              |                      |        |- $(modorder-target): $(subdir-ym) FORCE    # __build目标，也依赖$(subdir-ym)目标，此处不重复展开
+                                                              |                      |               $(Q)(cat /dev/null; $(modorder-cmds)) > $@
+                                                              |                      |                                     |
+                                                              |                      |                                     |  # 按照$(obj-y)和$(obj-m)变量值，推算最终可以产生的.ko文件，以及它们的生成顺序，记录到modules.order文件
+                                                              |                      |                                     |- modorder-cmds =                        \
+                                                              |                      |                                            $(foreach m, $(modorder),            \     # 遍历$(modorder)
+                                                              |                      |                                              | $(if $(filter %/modules.order, $m), \  # 遇到xx/modules.order，输出文件内容
+                                                              |                      |                                              |     cat $m;, echo kernel/$m;))         # 遇到ko文件名，原样输出
+                                                              |                      |                                              |
+                                                              |                      |                                              |  # include scripts/Kbuild.include在前 (包含"modorder:="语句)，所以用的是:= (延迟赋值)
+                                                              |                      |                                              |  # include scripts/Makefile.lib在后 (包含"obj-y:="语句)
+                                                              |                      |                                              |- modorder := $(patsubst %/,%/modules.order, $(filter %/, $(obj-y)) $(obj-m:.o=.ko))
+                                                              |                      |                                                               |                              |                      |- xx.o -> xx.ko (hello.ko)
+                                                              |                      |                                                               |                              |                      |- 目录保持不变 (sub1 sub2)
+                                                              |                      |                                                               |                              |- 对于$(obj-y)，只挑选目录目标
+                                                              |                      |                                                               |- 编译目标包含"目录目标+.o目标"，目录目标替换为"xx/modules.order"，.o目标替换为xx.ko
+                                                              |                      |
+                                                              |                      |  # 对于.o目标依赖多个.c文件的情况，比如：
+                                                              |                      |  #  obj-m  += hello.o
+                                                              |                      |  #  hello-y := a.o b.o
+                                                              |                      |  # 这里则相当于生成"中间".o文件(a.o、b.o)，所以不会将目标记录到$(MODVERDIR)目录中的.mod文件
+                                                              |                      |  # $(obj-m)中的hello.o，会命中后面的$(multi-used-m)目标，根据"中间".o文件链接生成，那时就会记录到.mod文件
+                                                              |                      |- $(obj)/%.o: $(src)/%.c $(recordmcount_source) $(objtool_dep) FORCE
+                                                              |                      |      $(call cmd,force_checksrc)
+                                                              |                      |      $(call if_changed_rule,cc_o_c)  # if_changed_rule与if_changed类似，区别是if_changed执行cmd_$1，而if_changed_rule执行rule_$1
+                                                              |                      |                              |
+                                                              |                      |                              |- define rule_cc_o_c
+                                                              |                      |                                     $(call cmd,checksrc)
+                                                              |                      |                                     $(call cmd_and_fixdep,cc_o_c)
+                                                              |                      |                                     $(call cmd,gen_ksymdeps)   |
+                                                              |                      |                                     $(call cmd,checkdoc)       |  # 编译依赖文件，生成.o文件
+                                                              |                      |                                     $(call cmd,objtool)        |- cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
+                                                              |                      |                                     $(call cmd,modversions_c)
+                                                              |                      |                                     $(call cmd,record_mcount)
+                                                              |                      |                                 endef
+                                                              |                      |
+                                                              |                      |  # 对于.o目标依赖单个.c文件的情况，会优先命中这里的规则 (静态模式规则：$(single-used-m)中包含明确的目标)
+                                                              |                      |- $(single-used-m): $(obj)/%.o: $(src)/%.c $(recordmcount_source) $(objtool_dep) FORCE
+                                                              |                      |    | $(call cmd,force_checksrc)
+                                                              |                      |    | $(call if_changed_rule,cc_o_c)
+                                                              |                      |    | @{ echo $(@:.o=.ko); echo $@; \  # 相比依赖多个.c的.o，这里会将目标(后缀换成.ko)，记录到$(MODVERDIR)目录中的.mod文件
+                                                              |                      |    |     $(cmd_undef_syms); } > $(MODVERDIR)/$(@F:.o=.mod)
+                                                              |                      |    |
+                                                              |                      |    |  # 依赖单个.c文件的目标
+                                                              |                      |    |- single-used-m := $(sort $(filter-out $(multi-used-m),$(obj-m)))
+                                                              |                      |
+                                                              |                      |  # 链接"中间".o文件(a.o、b.o)，生成目标.o文件(hello.o)
+                                                              |                      |- $(multi-used-m): FORCE
+                                                              |                             $(call if_changed,link_multi-m)                # 执行：cmd_link_multi-m
+                                                              |                             @{ echo $(@:.o=.ko); echo $(filter %.o,$^); \  # 将目标(后缀换成.ko)，记录到$(MODVERDIR)目录中的.mod文件
+                                                              |                                $(cmd_undef_syms); } > $(MODVERDIR)/$(@F:.o=.mod)
+                                                              |
+                                                              |  # 递归执行子目录中的Makefile
+                                                              |- $(subdir-ym):
+                                                                   | $(Q)$(MAKE) $(build)=$@ need-builtin=$(if $(findstring $@,$(subdir-obj-y)),1)
+                                                                   |                      |                                      |  # built-in.a包含同目录的*.o及其所有子目录中的built-in.a
+                                                                   |                      |                                      |- subdir-obj-y := $(filter %/built-in.a, $(obj-y))
+                                                                   |                      |                                                                                  |  # $(obj-y)中的目标目标，替换为目录目标/built-in.a
+                                                                   |                      |- 执行scripts/Makefile.build (include 目录目标/Makefile)                          |- obj-y := $(patsubst %/, %/built-in.a, $(obj-y))
+                                                                   |                                                                                                         |  # 目录目标已经记录到$(subdir-ym)中了，从$(obj-m)中剔除
+                                                                   |                                                                                                         |- obj-m := $(filter-out %/, $(obj-m))
+                                                                   |
+                                                                   |  # 将$(obj-y)和$(obj-m)中的目录目标，筛选到$(subdir-ym)
+                                                                   |- subdir-ym    := $(sort $(subdir-y) $(subdir-m))
+                                                                                            |           |- __subdir-m    := $(patsubst %/,%,$(filter %/, $(obj-m)))  # $(obj-m)中的目录目标
+                                                                                            |           |- subdir-m    += $(__subdir-m)
+                                                                                            |
+                                                                                            |- __subdir-y    := $(patsubst %/,%,$(filter %/, $(obj-y)))  # $(obj-y)中的目录目标
+                                                                                            |- subdir-y    += $(__subdir-y)
+
+
+>>>>>>> 外部模块Makefile执行过程 (简要) <<<<<<<
+
+执行外部模块Makefile else分支
+ |
+ |- 嵌套执行内核顶层Makefile
+     |
+     |- 命中modules目标
+         |
+         |- 依赖$(module-dirs)目标
+         |   |- 嵌套执行scripts/Makefile.build
+         |       |- include 外部模块Makefile    # 此时ifndef分支中的语句有效
+         |       |- 命中__build默认目标
+         |           |- 依赖$(obj-m)目标集
+         |           |   |- 编译.c文件，生成.o文件  # 根据外部模块Makefile的obj-m变量内容
+         |           |- 依赖$(modorder-target)目标集
+         |           |   |- 生成.order文件
+         |           |- 依赖$(subdir-ym)目标集  # 包含外部模块顶层目录中的子目录
+         |               |- 嵌套执行scripts/Makefile.build
+         |                   |-  ...  # 顺着目录的逐层依赖关系，继续递归执行scripts/Makefile.build
+         |
+         |- 嵌套执行scripts/Makefile.modpost
+             |- 命中$(modules)静态模式目标
+                 |- 链接.o文件，生成.ko文件
+
+
+>>>>>>> make menuconfig执行过程 <<<<<<<
+
+内核顶层Makefile
+ |
+ |- %config: scripts_basic outputmakefile FORCE
+      | $(Q)$(MAKE) $(build)=scripts/kconfig $@
+      |     |                                |- menuconfig (menuconfig根据模式匹配，命中%config目标，$@为Makefile自动推导变量，代表当前编译目标)
+      |     |- make -f $(srctree)/scripts/Makefile.build obj=scripts/kconfig menuconfig
+      |                            |
+      |                            |- include scripts/kconfig/Makefile  # 包含make命令行("$(Q)$(MAKE) $(build)=scripts/kconfig $@")，指定的目标$@，即menuconfig
+      |                                        |
+      |                                        |- hostprogs-y    += mconf  # $(hostprogs-y)目标集的命中过程，参考下面"fixdep可执行文件"过程
+      |                                        |- menuconfig: $(obj)/mconf  # 先根据依赖目标，生成mconf程序
+      |                                               $< $(silent) $(Kconfig)  # 忽略$(silent)部分
+      |                                               |               |
+      |                                               |               |  # 执行make menuconfig时，用户可以对各个模块选择：y(编译进内核)/n(不编译)/m(编译成模块)
+      |                                               |               |- Kconfig  # 选择界面的内容，就是来自Kconfig文件
+      |                                               |
+      |                                               |  # 执行mconf程序，解析Kconfig树，引导用户选择，生成.config文件
+      |                                               |  # $<为Makefile自动推导变量，表示依赖列表中的第一个依赖对象，即$(obj)/mconf
+      |                                               |- $(obj)/mconf Kconfig
+      |  # 生成fixdep可执行文件
+      |- scripts_basic:
+      |      $(Q)$(MAKE) $(build)=scripts/basic
+      |          |- make -f $(srctree)/scripts/Makefile.build obj=scripts/basic
+      |                                 |
+      |                                 |- include scripts/basic/Makefile
+      |                                 |           |
+      |                                 |           |- hostprogs-y   := fixdep  # __build依赖$(always) -> always := $(hostprogs-y) -> $(hostprogs-y)包含fixdep
+      |                                 |           |- always        := $(hostprogs-y)
+      |                                 |
+      |                                 |  # $(hostprogs-y)不为空
+      |                                 |- ifneq ($(hostprogs-y)$(hostprogs-m)$(hostlibs-y)$(hostlibs-m)$(hostcxxlibs-y)$(hostcxxlibs-m),)
+      |                                 |   |- include scripts/Makefile.host
+      |                                 |               |
+      |                                 |               |  # $(hostprogs-y)，为$(__hostprogs)的子集
+      |                                 |               |- __hostprogs := $(sort $(hostprogs-y) $(hostprogs-m))
+      |                                 |               |
+      |                                 |               |  # 将$(__hostprogs)目标集，划分为3个部分
+      |                                 |               |- host-csingle := $(foreach m,$(__hostprogs), \
+      |                                 |               |              $(if $($(m)-objs)$($(m)-cxxobjs),,$(m)))
+      |                                 |               |- host-cmulti    := $(foreach m,$(__hostprogs),\
+      |                                 |               |             $(if $($(m)-cxxobjs),,$(if $($(m)-objs),$(m))))
+      |                                 |               |- host-cobjs    := $(sort $(foreach m,$(__hostprogs),$($(m)-objs)))
+      |                                 |               |
+      |                                 |               |  # 3个部分的合集，一定包含$(hostprogs-y)中的全部目标
+      |                                 |               |  # 疑问：这里的第一目标，不会与scripts/Makefile.build中的__build，争夺"默认目标"属性吗？
+      |                                 |               |- $(host-csingle): $(obj)/%: $(src)/%.c FORCE
+      |                                 |               |      $(call if_changed_dep,host-csingle)
+      |                                 |               |- $(host-cmulti): FORCE
+      |                                 |               |      $(call if_changed,host-cmulti)
+      |                                 |               |- $(host-cobjs): $(obj)/%.o: $(src)/%.c FORCE
+      |                                 |                      $(call if_changed_dep,host-cobjs)  |
+      |                                 |                                                         |  # FORCE目标编译规则为"FORCE:"，没有命令部分，所以不会产生FORCE文件
+      |                                 |                                                         |- 使依赖FORCE的目标，认为依赖列表中的FORCE文件已被删除，从而总是重新生成
+      |                                 |
+      |                                 |  # make menuconfig执行流程中，$(KBUILD_BUILTIN),$(KBUILD_MODULES),$(subdir-ym)为空
+      |                                 |  # Q：scripts/Makefile.host包含编译目标，__build在整个展开内容中还是默认目标吗？
+      |                                 |- __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
+      |                                         $(if $(KBUILD_MODULES),$(obj-m) $(modorder-target)) \
+      |                                         $(subdir-ym) $(always)
+      |                                        @:              |
+      |                                                        |- 命中scripts/Makefile.host中的fixdep目标
+      |
+      |  # 用于make命令行，指定了"O=XX"参数时
+      |- outputmakefile:
+         ifneq ($(srctree),.)                  # XX目录 != 内核源码顶层目录
+                $(Q)ln -fsn $(srctree) source  # 在XX目录创建软链接文件source，链接到内核源码顶层目录
+                $(Q)$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile $(srctree)
+                $(Q)test -e .gitignore || \
+                { echo "# this is build directory, ignore it"; echo "*"; } > .gitignore
+         endif   |
+                 |  # 选择bash/sh等shell脚本解释程序
+                 |- CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
+                 |        else if [ -x /bin/bash ]; then echo /bin/bash; \
+                 |        else echo sh; fi ; fi)
+                 |
+                 |  # 执行scripts/mkmakefile脚本，在XX目录创建Makefile
+                 |- cat << EOF > Makefile
+                    include $(realpath $1/Makefile)  # 内容只包含一条include语句，包含顶层目录中的Makefile
+                    EOF
+
+
+>>>>>>> make menuconfig执行过程 (简要) <<<<<<<
+
+menuconfig命中%config目标（模式匹配）
+ |
+ |- 依赖$(scripts_basic)目标
+ |   |- 嵌套执行scripts/Makefile.build
+ |       |- include scripts/basic/Makefile
+ |       |           |- hostprogs-y := fixdep
+ |       |           |- always      := $(hostprogs-y)
+ |       |- include scripts/Makefile.host   # 由于$(hostprogs-y)不为空
+ |       |           |- 包含$(hostprogs-y)目标集的编译规则
+ |       |               |- 生成fixdep可执行文件 (用于产生.*.o.cmd和.*.o.d依赖记录文件)
+ |       |- 命中__build默认目标
+ |           |- 依赖$(always)目标  # 命中scripts/Makefile.host中的$(hostprogs-y)目标集
+ |
+ |- 依赖$(outputmakefile)目标
+ |   |- 在"O=XX"参数指定的目标，创建内核源码"副本"  # 参考"make menuconfig"过程
+ |
+ |- 嵌套执行scripts/Makefile.build
+     |- include scripts/kconfig/Makefile
+         |- hostprogs-y    += mconf
+         |- 命中menuconfig目标
+             |- 依赖$(obj)/mconf目标  # 命中scripts/Makefile.host中的$(hostprogs-y)目标集
+             |- 命令部分执行mconf程序，解析Kconfig树，引导用户选择，生成.config文件
+
+
+>>>>>>> vmlinux内核文件生成过程 <<<<<<<
+
+内核顶层Makefile
+ |
+ |  # make命令行指定all/_all/modules目标，或者不指定目标时，由obj-m和modorder-target指定的目标，也会被生成
+ |- ifneq ($(filter all _all modules,$(MAKECMDGOALS)),)
+ |   |- KBUILD_MODULES := 1
+ |- ifeq ($(MAKECMDGOALS),)
+ |   |- KBUILD_MODULES := 1
+ |
+ |- all: vmlinux
+          |
+          |  # scripts/link-vmlinux.sh：由内核源码自带
+          |  # autoksyms_recursive：从System.map中裁剪内核中定义但未被使用的符号 (根据CONFIG_TRIM_UNUSED_KSYMS配置项决定是否执行)
+          |- vmlinux: scripts/link-vmlinux.sh autoksyms_recursive $(vmlinux-deps) FORCE
+                 +$(call if_changed,link-vmlinux)                   |
+                                     |                              |- init-y        := init/
+                                     |                              |  drivers-y     := drivers/ sound/
+                                     |                              |  drivers-$(CONFIG_SAMPLES) += samples/
+                                     |                              |  net-y         := net/
+                                     |                              |  libs-y        := lib/
+                                     |                              |  core-y        := usr/
+                                     |                              |  virt-y        := virt/
+                                     |                              |
+                                     |                              |  # -y目录目标，就是要在该目录下生成built-in.a文件 (最终静态链到到vmlinux)
+                                     |                              |- init-y        := $(patsubst %/, %/built-in.a, $(init-y))
+                                     |                              |  core-y        := $(patsubst %/, %/built-in.a, $(core-y))
+                                     |                              |  drivers-y     := $(patsubst %/, %/built-in.a, $(drivers-y))
+                                     |                              |  net-y         := $(patsubst %/, %/built-in.a, $(net-y))
+                                     |                              |  libs-y1       := $(patsubst %/, %/lib.a, $(libs-y))
+                                     |                              |  libs-y2       := $(patsubst %/, %/built-in.a, $(filter-out %.a, $(libs-y)))
+                                     |                              |  virt-y         := $(patsubst %/, %/built-in.a, $(virt-y))
+                                     |                              |
+                                     |                              |- $(sort $(vmlinux-deps)): $(vmlinux-dirs) ;
+                                     |                                          |                 |
+                                     |                                          |                 |  # $(vmlinux-dirs)包含$(vmlinux-deps)中的目录目标
+                                     |                                          |                 |  # 最终init/、drivers/ sound/等目录，生成built-in.a，lib/目录除了生成uilt-in.a，还生成lib.a
+                                     |                                          |                 |- $(vmlinux-dirs): prepare  # prepare为编译工作的准备部分 (单独介绍)
+                                     |                                          |                      | $(Q)$(MAKE) $(build)=$@ need-builtin=1
+                                     |                                          |                      |     |
+                                     |                                          |                      |     |  # 递归命中子目录/Makefile中的目标
+                                     |                                          |                      |     |- make -f $(srctree)/scripts/Makefile.build obj=子目录 need-builtin=1
+                                     |                                          |                      |                            |- include 子目录/Makefile
+                                     |                                          |                      |                            |- __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
+                                     |                                          |                      |                                    $(if $(KBUILD_MODULES),$(obj-m) $(modorder-target)) \
+                                     |                                          |                      |                                    $(subdir-ym) $(always)
+                                     |                                          |                      |                                   @:
+                                     |                                          |                      |
+                                     |                                          |                      |  # 包含$(vmlinux-deps)中的目录部分
+                                     |                                          |                      |- vmlinux-dirs    := $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+                                     |                                          |                                      $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+                                     |                                          |                                      $(net-y) $(net-m) $(libs-y) $(libs-m) $(virt-y)))
+                                     |                                          |
+                                     |                                          |- vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_OBJS) $(KBUILD_VMLINUX_LIBS)
+                                     |                                                               |             |                      |  # 内核库
+                                     |                                                               |             |                      |- export KBUILD_VMLINUX_LIBS := $(libs-y1)
+                                     |                                                               |             |- # 内核模块目标
+                                     |                                                               |             |- export KBUILD_VMLINUX_OBJS := $(head-y) $(init-y) $(core-y) $(libs-y2) \
+                                     |                                                               |                                  $(drivers-y) $(net-y) $(virt-y)
+                                     |                                                               |  # vmlinux链接脚本
+                                     |                                                               |- export KBUILD_LDS := arch/$(SRCARCH)/kernel/vmlinux.lds
+                                     |  # 调用脚本对生成的依赖文件进行链接，生成vmlinux文件
+                                     |- cmd_link-vmlinux =                                                 \
+                                            $(CONFIG_SHELL) $< $(LD) $(KBUILD_LDFLAGS) $(LDFLAGS_vmlinux) ;    \  # $<：scripts/link-vmlinux.sh (依赖列表中的第一个依赖对象)
+                                            $(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) $@, true)          # 有些架构平台需要额外执行Makefile.postlink
+
+
+>>>>>>> vmlinux内核文件生成过程 (简要) <<<<<<<
+
+vmlinux目标
+ |
+ |- 依赖scripts/link-vmlinux.sh目标  # 该脚本由内核源码自带
+ |- 依赖autoksyms_recursive目标      # 裁剪内核符号
+ |
+ |  # 在各个子目录中生成built-in.a静态库 (每个目录中的built-in.a，包含下层目录中的built-in.a和本层目录中的.o文件)
+ |- 依赖$(vmlinux-deps)目标集  # 包含$(KBUILD_LDS)链接脚本、$(KBUILD_VMLINUX_OBJS)内核模块、$(KBUILD_VMLINUX_LIBS)内核库
+ |   |                         # 命令部分为空
+ |   |                         #  Q: $(vmlinux-deps)中的目标如何生成??
+ |   |                         #  A：$(KBUILD_VMLINUX_OBJS)和$(KBUILD_VMLINUX_LIBS)，根据依赖目标$(vmlinux-dirs)生成
+ |   |                         #     $(KBUILD_LDS)，即vmlinux.lds呢??
+ |   |                         #  Q: 为什么不让依赖$(vmlinux-deps)的目标，直接依赖$(vmlinux-dirs)??
+ |   |                         #  A：
+ |   |- 依赖$(vmlinux-dirs)目标集  # 包含内核顶层目录中的一些子目录
+ |       |                         # make会为每个目标，执行一次"$(Q)$(MAKE) $(build)=$@ need-builtin=1" (见编译规则的命令部分)
+ |       |- 依赖prepare目标 (单独介绍)
+ |       |- 嵌套执行scripts/Makefile.build
+ |           |- include XX子目录/Makefile  # obj参数值为$@，即当前命中目标 ($(vmlinux-dirs)包含的某个子目录名称)
+ |           |   |  # 参考"编译外部模块"的$(subdir-ym)目标集编译过程
+ |           |   |- XX子目录Makefile又会递归执行scripts/Makefile.build，在本身所在目录的子目录中，生成built-in.a
+ |           |- 命中__build默认目标
+ |               |- 生成XX子目录/built-in.a
+ |
+ |- 如果依赖目标有更新，执行cmd_link-vmlinux
+     |- 执行scripts/link-vmlinux.sh脚本
+         |- 链接根据依赖目标生成的.a文件，生成vmlinux
+         |- CONFIG_KALLSYMS=y时，为vmlinux添加__kallsyms节 (记录符号信息，用于调试)
+         |- 生成System.map文件 (记录计算的符号运行时地址)
+
+
+>>>>>>> vmlinuz内核文件生成过程 <<<<<<<
+
+arch/arm/Makefile
+ |
+ |  # vmlinuz是一个统称，包括zImage和bzImage两种形式
+ |  # vmlinuz不仅是一个压缩文件，而且在文件的开头部分内嵌了gzip解压缩代码，比如根据vmlinuz还原vmlinux：
+ |  #  od -A d -t x1 vmlinuz > temp
+ |  #  dd if=vmlinuz bs=1 skip="1f 8b 08 00"在temp文件的偏移 | zcat > vmlinux
+ |- $(BOOT_TARGETS): vmlinux
+      | $(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+      |     |                                             |- boot := arch/arm/boot
+      |     |  # 例如，目标为Image时
+      |     |- make -f $(srctree)/scripts/Makefile.build obj=arch/arm/boot MACHINE=xx arch/arm/boot/Image
+      |                            |
+      |                            |  # 包含嵌套执行make指定的目标
+      |                            |- include arch/arm/boot/Makefile
+      |                                        |
+      |                                        |- $(obj)/Image: vmlinux FORCE
+      |                                        |  	$(call if_changed,objcopy)
+      |                                        |                       |  # 执行objcopy命令
+      |                                        |                       |- cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $(OBJCOPYFLAGS_$(@F)) $< $@
+      |                                        |                                          |          |
+      |                                        |                                          |          |  # -O binary：输出格式为二进制
+      |                                        |                                          |          |  # -R .comment：移除.comment段
+      |                                        |                                          |          |  # -S：移除所有符号以及重定位信息
+      |                                        |                                          |          |- OBJCOPYFLAGS :=-O binary -R .comment -S
+      |                                        |                                          |
+      |                                        |                                          |  # 将指定的部分复制到目标文件
+      |                                        |                                          |- OBJCOPY = $(CROSS_COMPILE)objcopy
+      |                                        |
+      |                                        |  # 与Image区别是：zImage依赖compressed/vmlinux，而不是原生的vmlinux
+      |                                        |- $(obj)/zImage:    $(obj)/compressed/vmlinux FORCE
+      |                                               $(call if_changed,objcopy)
+      |
+      |- BOOT_TARGETS    = zImage Image xipImage bootpImage uImage
+
+
+>>>>>>> make prepare执行过程 <<<<<<<
+
+内核顶层Makefile
+ |
+ |- prepare: prepare0 prepare-objtool
+              |
+              |- prepare0: archprepare  ---------------+
+                     $(Q)$(MAKE) $(build)=scripts/mod  |
+                     $(Q)$(MAKE) $(build)=. |          |  # 没有命令部分
+                         |                  |          |- archprepare: archheaders archscripts prepare1 scripts
+                         |                  |                           |           |           |        |
+                         |                  |                           |           |           |        |  # scripts_basic：参考"make menuconfig"过程
+                         |                  |                           |           |           |        |- scripts: scripts_basic scripts_dtc
+                         |                  |                           |           |           |            |  $(Q)$(MAKE) $(build)=$(@)
+                         |                  |                           |           |           |            |      |- make -f $(srctree)/scripts/Makefile.build obj=scripts
+                         |                  |                           |           |           |            |                             |  # 包含bin2c、kallsyms、pnmtologo等目标
+                         |                  |                           |           |           |            |                             |- include scripts/Makefile
+                         |                  |                           |           |           |            |
+                         |                  |                           |           |           |            |- scripts_dtc: scripts_basic
+                         |                  |                           |           |           |                   $(Q)$(MAKE) $(build)=scripts/dtc
+                         |                  |                           |           |           |                       |- make -f $(srctree)/scripts/Makefile.build obj=scripts/dtc
+                         |                  |                           |           |           |                                              |  # 包含dtc目标 (设备树编译器)
+                         |                  |                           |           |           |                                              |- include scripts/dtc/Makefile
+                         |                  |                           |           |           |
+                         |                  |                           |           |           |  # outputmakefile：参考"make menuconfig"过程
+                         |                  |                           |           |           |  # asm-generic $(version_h) $(autoksyms_h)：
+                         |                  |                           |           |           |  #  架构相关的头文件
+                         |                  |                           |           |           |  #  include/generated/uapi/linux/version.h
+                         |                  |                           |           |           |  #  include/generated/autoksyms.h
+                         |                  |                           |           |           |- prepare1: prepare3 outputmakefile asm-generic $(version_h) $(autoksyms_h) \
+                         |                  |                           |           |               |                      include/generated/utsrelease.h
+                         |                  |                           |           |               |  $(cmd_crmodverdir)
+                         |                  |                           |           |               |    |
+                         |                  |                           |           |               |    |  # 如果不是编译外部模块，清除$(MODVERDIR)目录
+                         |                  |                           |           |               |    |- cmd_crmodverdir = $(Q)mkdir -p $(MODVERDIR) \
+                         |                  |                           |           |               |                         $(if $(KBUILD_MODULES),; rm -f $(MODVERDIR)/*)
+                         |                  |                           |           |               |
+                         |                  |                           |           |               |  # 指定"O=XX"参数时，检查上次编译的残留中间文件，避免后续报错
+                         |                  |                           |           |               |- prepare3: include/config/kernel.release
+                         |                  |                           |           |                  ifneq ($(srctree),.)
+                         |                  |                           |           |                      @$(kecho) '  Using $(srctree) as source for kernel'
+                         |                  |                           |           |                      $(Q)if [ -f $(srctree)/.config -o \
+                         |                  |                           |           |                           -d $(srctree)/include/config -o \
+                         |                  |                           |           |                           -d $(srctree)/arch/$(SRCARCH)/include/generated ]; then \
+                         |                  |                           |           |                          echo >&2 "  $(srctree) is not clean, please run 'make mrproper'"; \
+                         |                  |                           |           |                          echo >&2 "  in the '$(srctree)' directory.";\
+                         |                  |                           |           |                          /bin/false; \
+                         |                  |                           |           |                      fi;
+                         |                  |                           |           |                  endif
+                         |                  |                           |           |
+                         |                  |                           |           |  # 少量平台 (比如：arch/mips/Makefile)，需要生成一些额外的中间程序
+                         |                  |                           |           |- archscripts: scripts_basic
+                         |                  |                           |                  $(Q)$(MAKE) $(build)=arch/mips/tools elf-entry
+                         |                  |                           |                  $(Q)$(MAKE) $(build)=arch/mips/boot/tools relocs
+                         |                  |                           |
+                         |                  |                           |  # 定义于arch/$(ARCH)/Makfile (比如：arch/arm/Makefile)
+                         |                  |                           |- archheaders:
+                         |                  |                                  $(Q)$(MAKE) $(build)=arch/arm/tools uapi  # 指定uapi目标，生成用户程序头文件
+                         |                  |                                      |- make -f $(srctree)/scripts/Makefile.build obj=arch/arm/tools
+                         |                  |                                                             |
+                         |                  |                                                             |- include arch/arm/tools/mod/Makefile
+                         |                  |                                                                         |- uapi-hdrs-y := $(uapi)/unistd-common.h
+                         |                  |                                                                         |- uapi-hdrs-y += $(uapi)/unistd-oabi.h
+                         |                  |                                                                         |- uapi-hdrs-y += $(uapi)/unistd-eabi.h
+                         |                  |                                                                         |- uapi:    $(uapi-hdrs-y)
+                         |                  |
+                         |                  |  # 生成一些可执行文件和.h文件
+                         |                  |- make -f $(srctree)/scripts/Makefile.build obj=scripts/mod
+                         |                                         |
+                         |                                         |- include scripts/mod/Makefile
+                         |                                         |           |
+                         |                                         |           |  # 生成modpost和mk_elfconfig可执行文件 (参考"make menuconfig"的depfix生成过程)
+                         |                                         |           |- hostprogs-y    := modpost mk_elfconfig
+                         |                                         |           |- always        := $(hostprogs-y) empty.o
+                         |                                         |           |
+                         |                                         |           |  # 生成scripts/mod/devicetable-offsets.h
+                         |                                         |           |- $(obj)/$(devicetable-offsets-file): $(obj)/devicetable-offsets.s FORCE
+                         |                                         |                | $(call filechk,offsets,__DEVICETABLE_OFFSETS_H__)
+                         |                                         |                |  # 该目标的命中过程，就不详细介绍了
+                         |                                         |                |- devicetable-offsets-file := devicetable-offsets.h
+                         |                                         |
+                         |                                         |  # $(hostprogs-y)不为空
+                         |                                         |- ifneq ($(hostprogs-y)$(hostprogs-m)$(hostlibs-y)$(hostlibs-m)$(hostcxxlibs-y)$(hostcxxlibs-m),)
+                         |                                         |   |- include scripts/Makefile.host
+                         |                                         |               |- 包含$(hostprogs-y)目标集的编译规则
+                         |                                         |
+                         |                                         |  # 编译目标为vmlinux时，$(KBUILD_MODULES)为1
+                         |                                         |- __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
+                         |                                                 $(if $(KBUILD_MODULES),$(obj-m) $(modorder-target)) \
+                         |                                                 $(subdir-ym) $(always)   |        |
+                         |                                                @:              |         |--------+-- 参考"编译外部模块"过程
+                         |                                                                |-- 参考"make menuconfig"过程  # 命中scripts/Makefile.host中的$(hostprogs-y)目标集
+                         |
+                         |- make -f $(srctree)/scripts/Makefile.build obj=.
+                                                |
+                                                |  # $(kbuild-dir)的定义，决定了优先级：Kbuild > Makefile (见Kbuild内置函数$(build)分析)
+                                                |- include ./Kbuild
+                                                            |
+                                                            |- bounds-file := include/generated/bounds.h
+                                                            |- $(bounds-file): kernel/bounds.s FORCE
+                                                            |      $(call filechk,offsets,__LINUX_BOUNDS_H__)
+                                                            |
+                                                            |- timeconst-file := include/generated/timeconst.h
+                                                            |- $(timeconst-file): kernel/time/timeconst.bc FORCE
+                                                            |      $(call filechk,gentimeconst)
+                                                            |
+                                                            |- offsets-file := include/generated/asm-offsets.h
+                                                            |- $(offsets-file): arch/$(SRCARCH)/kernel/asm-offsets.s FORCE
+                                                            |      $(call filechk,offsets,__ASM_OFFSETS_H__)
+                                                            |
+                                                            |- missing-syscalls: scripts/checksyscalls.sh $(offsets-file) FORCE
+                                                            |      $(call cmd,syscalls)
+                                                            |- ...
+
+
+>>>>>>> make prepare执行过程 (简要) <<<<<<<
+
+prepare目标  # 没有命令部分
+ |- 依赖prepare0目标
+     |- 依赖archprepare目标  # 没有命令部分
+     |   |- 依赖archheaders目标
+     |   |   |- 嵌套执行scripts/Makefile.build
+	 |   |       |- include arch/arm/tools/mod/Makefile
+	 |   |           |- 包含uapi目标
+     |   |- 依赖archscripts目标  # 少量平台 (比如：arch/mips/Makefile)，需要生成一些额外的中间程序
+     |   |- 依赖prepare1目标
+     |   |   |- 依赖prepare3目标
+     |   |   |   |- 指定"O=XX"参数时，检查上次编译的残留中间文件，避免后续报错
+     |   |   |- 依赖outputmakefile目标
+     |   |   |- 依赖asm-generic、$(version_h)、$(autoksyms_h)、include/generated/utsrelease.h目标
+     |   |   |- 执行cmd_crmodverdir
+     |   |       |- 清除$(MODVERDIR)目录
+     |   |- 依赖scripts目标
+     |       |- 依赖scripts_basic目标  # 参考"make menuconfig"过程
+     |       |- 依赖scripts_dtc目标
+     |       |- 嵌套执行scripts/Makefile.build
+     |           |- include scripts/Makefile
+     |               |- 包含bin2c、kallsyms、pnmtologo等目标
+     |- 嵌套执行scripts/Makefile.build
+     |   |- include scripts/mod/Makefile
+     |       |- 包含modpost、mk_elfconfig、devicetable-offsets.h等目标
+     |- 嵌套执行scripts/Makefile.build
+         |- include 顶层目录/Kbuild
+
