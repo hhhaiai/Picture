@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="xai-title">
+  <title id="xai-title">XAI Router - Client to Model Providers</title>
+  
+  <!-- CSS Animations -->
+  <style>
+    .flow-line {
+      stroke-dasharray: 12,6;
+      animation: flow 1.6s linear infinite;
+    }
+    
+    @keyframes flow {
+      to { stroke-dashoffset: -36; }
+    }
+    
+    .pulse-center {
+      transform-origin: 400px 200px;
+      animation: pulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
+    
+    .rotate-slow {
+      transform-origin: 400px 200px;
+      animation: rotate-slow 16s linear infinite;
+    }
+    
+    .rotate-medium {
+      transform-origin: 400px 200px;
+      animation: rotate-medium 10s linear infinite;
+    }
+    
+    @keyframes rotate-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes rotate-medium {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(-360deg); }
+    }
+    
+    .fade-in {
+      animation: fade-in 1.5s ease-out;
+    }
+    
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .glow {
+      filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.5));
+      animation: glow-pulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes glow-pulse {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.5)); }
+      50% { filter: drop-shadow(0 0 12px rgba(14, 165, 233, 0.8)); }
+    }
+  </style>
+  
+  <!-- Background -->
+  <rect width="800" height="450" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2" rx="8"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1e293b">
+    XAI Router - Client to Model Providers
+  </text>
+  
+  <!-- Left side: Clients -->
+  <g class="fade-in">
+    <text x="120" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#475569">Clients</text>
+    
+    <!-- API Clients -->
+    <rect x="40" y="90" width="160" height="44" rx="8" fill="#06b6d4" fill-opacity="0.1" stroke="#06b6d4" stroke-width="2"/>
+    <text x="120" y="117" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#0891b2">API Clients</text>
+    
+    <!-- AI Agents -->
+    <rect x="40" y="144" width="160" height="44" rx="8" fill="#10b981" fill-opacity="0.1" stroke="#10b981" stroke-width="2"/>
+    <text x="120" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#059669">AI Agents</text>
+    
+    <!-- Claude Code -->
+    <rect x="40" y="198" width="160" height="44" rx="8" fill="#f97316" fill-opacity="0.1" stroke="#f97316" stroke-width="2"/>
+    <text x="120" y="225" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ea580c">Claude Code</text>
+    
+    <!-- Codex -->
+    <rect x="40" y="252" width="160" height="44" rx="8" fill="#6366f1" fill-opacity="0.1" stroke="#6366f1" stroke-width="2"/>
+    <text x="120" y="279" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#4f46e5">Codex</text>
+    
+    <!-- Gemini CLI -->
+    <rect x="40" y="306" width="160" height="44" rx="8" fill="#22c55e" fill-opacity="0.1" stroke="#22c55e" stroke-width="2"/>
+    <text x="120" y="333" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#16a34a">Gemini CLI</text>
+    
+    <!-- OpenCode -->
+    <rect x="40" y="360" width="160" height="44" rx="8" fill="#14b8a6" fill-opacity="0.1" stroke="#14b8a6" stroke-width="2"/>
+    <text x="120" y="387" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#0f766e">OpenCode</text>
+  </g>
+  
+  <!-- Center: XAI Router -->
+  <g class="pulse-center">
+    <circle cx="400" cy="200" r="80" fill="#0ea5e9" fill-opacity="0.1" stroke="#0ea5e9" stroke-width="3" class="glow"/>
+    <circle cx="400" cy="200" r="60" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="5,5" class="rotate-slow"/>
+    <circle cx="400" cy="200" r="40" fill="none" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="3,3" class="rotate-medium"/>
+    
+    <text x="400" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#0369a1">XAI Router</text>
+    
+    <!-- Center icon -->
+    <path d="M390 185 L400 175 L410 185 M395 190 H405" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" class="glow"/>
+  </g>
+  
+  <!-- Right side: Model Providers -->
+  <g class="fade-in">
+    <text x="680" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#475569">Model Providers</text>
+    
+    <!-- OpenAI -->
+    <rect x="600" y="90" width="160" height="44" rx="8" fill="#10b981" fill-opacity="0.1" stroke="#10b981" stroke-width="2"/>
+    <text x="680" y="117" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#059669">OpenAI</text>
+    
+    <!-- Anthropic -->
+    <rect x="600" y="144" width="160" height="44" rx="8" fill="#f97316" fill-opacity="0.1" stroke="#f97316" stroke-width="2"/>
+    <text x="680" y="171" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#ea580c">Anthropic</text>
+    
+    <!-- Gemini -->
+    <rect x="600" y="198" width="160" height="44" rx="8" fill="#4285F4" fill-opacity="0.1" stroke="#4285F4" stroke-width="2"/>
+    <text x="680" y="225" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#3367D6">Gemini</text>
+    
+    <!-- DeepSeek -->
+    <rect x="600" y="252" width="160" height="44" rx="8" fill="#3b82f6" fill-opacity="0.1" stroke="#3b82f6" stroke-width="2"/>
+    <text x="680" y="279" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#2563eb">DeepSeek</text>
+    
+    <!-- Open-Source / Local -->
+    <rect x="600" y="306" width="160" height="44" rx="8" fill="#64748b" fill-opacity="0.08" stroke="#64748b" stroke-width="2"/>
+    <text x="680" y="333" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#475569">Open-Source / Local</text>
+    
+    <!-- More Providers -->
+    <rect x="600" y="360" width="160" height="44" rx="8" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6,4"/>
+    <text x="680" y="387" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#64748b">More Providers</text>
+  </g>
+  
+  <!-- Arrows: Clients -> XAI Router -> Providers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+  </defs>
+  
+  <!-- From clients to center -->
+  <path d="M200 112 Q300 112 320 170" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M200 166 Q300 166 320 185" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M200 220 Q300 220 320 200" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M200 274 Q300 274 320 215" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M200 328 Q300 328 320 230" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M200 382 Q300 382 320 245" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  
+  <!-- From center to providers -->
+  <path d="M480 170 Q500 112 600 112" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M480 185 Q500 166 600 166" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M480 200 Q500 220 600 220" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M480 215 Q500 274 600 274" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M480 230 Q500 328 600 328" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  <path d="M480 245 Q500 382 600 382" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" class="flow-line"/>
+  
+</svg>
