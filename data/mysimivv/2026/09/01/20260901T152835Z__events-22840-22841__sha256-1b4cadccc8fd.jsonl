@@ -1,0 +1,2 @@
+{"v":2,"id":22840,"ts":1788254695565,"minute":1788254640000,"user":"fb07aea0799d8739","kind":"ws","method":"GET","requests":1,"status":101,"outcome":"success","up":375,"down":601,"duration":30848,"country":"CN","colo":"LAX","node":{"ip":"104.18.33.187","port":2083,"group":"官方通用-官方-2083-3"}}
+{"v":2,"id":22841,"ts":1788254829239,"minute":1788254820000,"user":"8ded3fff5d9679e9","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":25,"duration":0,"country":"US","colo":"CMH","node":null}
