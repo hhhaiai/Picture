@@ -1,0 +1,2 @@
+{"v":2,"id":49210,"ts":1788768121324,"minute":1788768120000,"user":"fb07aea0799d8739","kind":"ws","method":"GET","requests":1,"status":101,"outcome":"success","up":605,"down":9,"duration":610,"country":"CN","colo":"LAX","node":{"ip":"104.17.171.142","port":443,"group":"官方通用-官方-443-1"}}
+{"v":2,"id":49211,"ts":1788768123076,"minute":1788768120000,"user":"fb07aea0799d8739","kind":"ws","method":"GET","requests":1,"status":101,"outcome":"success","up":555,"down":9,"duration":790,"country":"CN","colo":"LAX","node":{"ip":"104.17.171.142","port":443,"group":"官方通用-官方-443-1"}}
