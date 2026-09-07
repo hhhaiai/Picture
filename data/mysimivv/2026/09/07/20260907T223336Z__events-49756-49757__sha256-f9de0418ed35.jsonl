@@ -1,0 +1,2 @@
+{"v":2,"id":49756,"ts":1788798804507,"minute":1788798780000,"user":"376faab722e6bd62","kind":"web","method":"HEAD","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"US","colo":"DFW","node":null}
+{"v":2,"id":49757,"ts":1788798804897,"minute":1788798780000,"user":"376faab722e6bd62","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"US","colo":"DFW","node":null}
