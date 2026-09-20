@@ -1,0 +1,4 @@
+{"v":2,"id":74055,"ts":1789857728021,"minute":1789857720000,"user":"96f025cb42aa4fe9","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"NL","colo":"AMS","node":null}
+{"v":2,"id":74056,"ts":1789857728569,"minute":1789857720000,"user":"96f025cb42aa4fe9","kind":"xhttp","method":"POST","requests":1,"status":400,"outcome":"success","up":137,"down":15,"duration":0,"country":"NL","colo":"AMS","node":null}
+{"v":2,"id":74057,"ts":1789857728896,"minute":1789857720000,"user":"96f025cb42aa4fe9","kind":"xhttp","method":"POST","requests":1,"status":400,"outcome":"success","up":53,"down":15,"duration":0,"country":"NL","colo":"AMS","node":null}
+{"v":2,"id":74058,"ts":1789857729208,"minute":1789857720000,"user":"96f025cb42aa4fe9","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"NL","colo":"AMS","node":null}
