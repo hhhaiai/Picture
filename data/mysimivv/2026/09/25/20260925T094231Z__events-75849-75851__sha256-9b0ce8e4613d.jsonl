@@ -1,0 +1,3 @@
+{"v":2,"id":75849,"ts":1790299834530,"minute":1790299800000,"user":"6360d5076ee92d9e","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":25,"duration":0,"country":"US","colo":"CMH","node":null}
+{"v":2,"id":75850,"ts":1790301234144,"minute":1790301180000,"user":"370bfa513285e50f","kind":"web","method":"HEAD","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"IN","colo":"MAA","node":null}
+{"v":2,"id":75851,"ts":1790301243848,"minute":1790301240000,"user":"370bfa513285e50f","kind":"web","method":"HEAD","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"IN","colo":"MAA","node":null}
