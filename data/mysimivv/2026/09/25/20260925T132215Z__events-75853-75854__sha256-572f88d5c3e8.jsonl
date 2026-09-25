@@ -1,0 +1,2 @@
+{"v":2,"id":75853,"ts":1790314062208,"minute":1790314020000,"user":"7739f9aea7db7710","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"CH","colo":"ZRH","node":null}
+{"v":2,"id":75854,"ts":1790314225350,"minute":1790314200000,"user":"6360d5076ee92d9e","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":25,"duration":0,"country":"US","colo":"CMH","node":null}
