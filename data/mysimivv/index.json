@@ -4,13 +4,22 @@
   "repository": "hhhaiai/Picture",
   "branch": "main",
   "archiveRoot": "data/mysimivv",
-  "updatedAt": 1790679783534,
+  "updatedAt": 1790681464236,
   "totals": {
-    "files": 756,
-    "rows": 78673,
-    "bytes": 21871599
+    "files": 757,
+    "rows": 78836,
+    "bytes": 21920378
   },
   "files": [
+    {
+      "path": "data/mysimivv/2026/09/29/20260929T113100Z__events-79378-79540__sha256-4016cb811e23.jsonl",
+      "archivedAt": 1790681460929,
+      "firstId": 79378,
+      "lastId": 79540,
+      "rows": 163,
+      "bytes": 48779,
+      "sha256": "4016cb811e23"
+    },
     {
       "path": "data/mysimivv/2026/09/29/20260929T110259Z__events-79000-79377__sha256-ea7ece7f699e.jsonl",
       "archivedAt": 1790679779647,
