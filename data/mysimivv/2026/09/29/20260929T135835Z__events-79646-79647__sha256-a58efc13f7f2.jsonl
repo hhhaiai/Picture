@@ -1,0 +1,2 @@
+{"v":2,"id":79646,"ts":1790668282777,"minute":1790668260000,"user":"fb07aea0799d8739","kind":"ws","method":"GET","requests":1,"status":101,"outcome":"success","up":555,"down":0,"duration":811,"country":"CN","colo":"HKG","node":{"ip":"172.67.64.62","port":8443,"group":"本网优先-联通-8443-6"}}
+{"v":2,"id":79647,"ts":1790668284159,"minute":1790668260000,"user":"fb07aea0799d8739","kind":"ws","method":"GET","requests":1,"status":101,"outcome":"success","up":573,"down":0,"duration":571,"country":"CN","colo":"HKG","node":{"ip":"172.67.64.62","port":8443,"group":"本网优先-联通-8443-6"}}
