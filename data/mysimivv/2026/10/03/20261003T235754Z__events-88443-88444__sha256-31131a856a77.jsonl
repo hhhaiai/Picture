@@ -1,0 +1,2 @@
+{"v":2,"id":88443,"ts":1791033662839,"minute":1791033660000,"user":"d1737481a29f562d","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":613,"duration":0,"country":"NL","colo":"AMS","node":null}
+{"v":2,"id":88444,"ts":1791044472278,"minute":1791044460000,"user":"6b69e0f1863abba2","kind":"web","method":"GET","requests":1,"status":200,"outcome":"success","up":0,"down":25,"duration":0,"country":"DE","colo":"TXL","node":null}
